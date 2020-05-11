@@ -13,6 +13,13 @@ uint256 CBlockHeader::GetHash() const
     return SerializeHash(*this);
 }
 
+uint256 CBlockHeader::GetWorkHash() const
+{
+    uint256 thash;
+    scryptHash(BEGIN(nVersion), BEGIN(thash));
+    return thash;
+}
+
 std::string CBlock::ToString() const
 {
     std::stringstream s;
