@@ -394,7 +394,6 @@ void TransactionView::contextualMenu(const QPoint &point)
     uint256 hash;
     hash.SetHex(selection.at(0).data(TransactionTableModel::TxHashRole).toString().toStdString());
     abandonAction->setEnabled(model->wallet().transactionCanBeAbandoned(hash));
-    bumpFeeAction->setEnabled(model->wallet().transactionCanBeBumped(hash));
 
     if(index.isValid())
     {

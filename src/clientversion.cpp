@@ -19,6 +19,24 @@ const std::string CLIENT_NAME("Satoshi");
  */
 #define CLIENT_VERSION_SUFFIX ""
 
+bool IsVerium()
+{
+#if CLIENT_IS_VERIUM
+    return true;
+#else
+    return false;
+#endif
+}
+
+bool IsVericoin()
+{
+#if CLIENT_IS_VERIUM
+    return false;
+#else
+    return true;
+#endif
+}
+
 
 /**
  * The following part of the code determines the CLIENT_BUILD variable.

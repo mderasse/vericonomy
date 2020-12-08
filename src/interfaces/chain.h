@@ -21,7 +21,6 @@ class CScheduler;
 class Coin;
 class uint256;
 enum class MemPoolRemovalReason;
-enum class RBFTransactionState;
 struct CBlockLocator;
 struct FeeCalculation;
 struct NodeContext;
@@ -98,10 +97,6 @@ public:
         //! (to avoid the cost of a second lookup in case this information is needed.)
         virtual Optional<int> findFirstBlockWithTimeAndHeight(int64_t time, int height, uint256* hash) = 0;
 
-        //! Return height of last block in the specified range which is pruned, or
-        //! nullopt if no block in the range is pruned. Range is inclusive.
-        virtual Optional<int> findPruned(int start_height = 0, Optional<int> stop_height = nullopt) = 0;
-
         //! Return height of the specified block if it is on the chain, otherwise
         //! return the height of the highest block on chain that's an ancestor
         //! of the specified block, or nullopt if there is no common ancestor.
@@ -146,9 +141,6 @@ public:
     //! the specified block hash are verified.
     virtual double guessVerificationProgress(const uint256& block_hash) = 0;
 
-    //! Check if transaction is RBF opt in.
-    virtual RBFTransactionState isRBFOptIn(const CTransaction& tx) = 0;
-
     //! Check if transaction has descendants in mempool.
     virtual bool hasDescendantsInMempool(const uint256& txid) = 0;
 
@@ -171,26 +163,17 @@ public:
     //! Check if transaction will pass the mempool's chain limits.
     virtual bool checkChainLimits(const CTransactionRef& tx) = 0;
 
-    //! Estimate smart fee.
-    virtual CFeeRate estimateSmartFee(int num_blocks, bool conservative, FeeCalculation* calc = nullptr) = 0;
-
-    //! Fee estimator max target.
-    virtual unsigned int estimateMaxBlocks() = 0;
-
     //! Mempool minimum fee.
     virtual CFeeRate mempoolMinFee() = 0;
 
-    //! Relay current minimum fee (from -minrelaytxfee and -incrementalrelayfee settings).
+    //! Relay current minimum fee (from -minrelaytxfee)
     virtual CFeeRate relayMinFee() = 0;
 
-    //! Relay incremental fee setting (-incrementalrelayfee), reflecting cost of relay.
-    virtual CFeeRate relayIncrementalFee() = 0;
+    //! current minimum transaction fee
+    virtual CFeeRate getMinTxFeeRate() = 0;
 
     //! Relay dust fee setting (-dustrelayfee), reflecting lowest rate it's economical to spend.
     virtual CFeeRate relayDustFee() = 0;
-
-    //! Check if any block has been pruned.
-    virtual bool havePruned() = 0;
 
     //! Check if the node is ready to broadcast transactions.
     virtual bool isReadyToBroadcast() = 0;

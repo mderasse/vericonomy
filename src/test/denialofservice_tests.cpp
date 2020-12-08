@@ -93,7 +93,7 @@ BOOST_AUTO_TEST_CASE(outbound_slow_chain_eviction)
     {
         LOCK(cs_main);
         BOOST_CHECK(::ChainActive().Tip() != nullptr);
-        BOOST_CHECK(::ChainActive().Tip()->nChainWork > 0);
+        BOOST_CHECK(::ChainActive().Tip()->nChainTrust > 0);
     }
 
     // Test starts here

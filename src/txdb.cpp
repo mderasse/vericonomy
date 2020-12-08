@@ -6,6 +6,7 @@
 #include <txdb.h>
 
 #include <pow.h>
+#include <pos.h>
 #include <random.h>
 #include <shutdown.h>
 #include <ui_interface.h>
@@ -275,9 +276,25 @@ bool CBlockTreeDB::LoadBlockIndexGuts(const Consensus::Params& consensusParams, 
                 pindexNew->nStatus        = diskindex.nStatus;
                 pindexNew->nTx            = diskindex.nTx;
 
-                if (!CheckProofOfWork(pindexNew->GetBlockHash(), pindexNew->nBits, consensusParams))
-                    return error("%s: CheckProofOfWork failed: %s", __func__, pindexNew->ToString());
+                // XXX: to check
+                // ppcoin related block index fields
+                pindexNew->nMint            = diskindex.nMint;
+                pindexNew->nMoneySupply     = diskindex.nMoneySupply;
+                pindexNew->nFlags           = diskindex.nFlags;
+                if (IsVericoin())
+                {
+                    pindexNew->nStakeModifier   = diskindex.nStakeModifier;
+                    pindexNew->prevoutStake     = diskindex.prevoutStake;
+                    pindexNew->nStakeTime       = diskindex.nStakeTime;
+                    pindexNew->hashProofOfStake = diskindex.hashProofOfStake;
+                }
 
+                /* Verium:
+                 *   We're not going to run the check here, as it takes a very long time at client startup.
+                 * Instead, we will assume that the local client data is valid.
+                 */
+                //if (!CheckProofOfWork(pindexNew->GetBlockHash(), pindexNew->nBits, consensusParams))
+                //    return error("%s: CheckProofOfWork failed: %s", __func__, pindexNew->ToString());
                 pcursor->Next();
             } else {
                 return error("%s: failed to read value", __func__);
@@ -304,6 +321,12 @@ public:
 
     //! at which height this transaction was included in the active block chain
     int nHeight;
+
+    // ppcoin: whether transaction is a coinstake
+    bool fCoinStake;
+
+    // ppcoin: transaction timestamp
+    unsigned int nTime;
 
     //! empty constructor
     CCoins() : fCoinBase(false), vout(0), nHeight(0) { }
@@ -388,7 +411,7 @@ bool CCoinsViewDB::Upgrade() {
             COutPoint outpoint(key.second, 0);
             for (size_t i = 0; i < old_coins.vout.size(); ++i) {
                 if (!old_coins.vout[i].IsNull() && !old_coins.vout[i].scriptPubKey.IsUnspendable()) {
-                    Coin newcoin(std::move(old_coins.vout[i]), old_coins.nHeight, old_coins.fCoinBase);
+                    Coin newcoin(std::move(old_coins.vout[i]), old_coins.nHeight, old_coins.fCoinBase, old_coins.fCoinStake, old_coins.nTime);
                     outpoint.n = i;
                     CoinEntry entry(&outpoint);
                     batch.Write(entry, newcoin);

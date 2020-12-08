@@ -15,7 +15,6 @@
 #include <node/psbt.h>
 #include <node/transaction.h>
 #include <policy/policy.h>
-#include <policy/rbf.h>
 #include <primitives/transaction.h>
 #include <psbt.h>
 #include <random.h>
@@ -420,11 +419,7 @@ static UniValue createrawtransaction(const JSONRPCRequest& request)
         }, true
     );
 
-    bool rbf = false;
-    if (!request.params[3].isNull()) {
-        rbf = request.params[3].isTrue();
-    }
-    CMutableTransaction rawTx = ConstructTransaction(request.params[0], request.params[1], request.params[2], rbf);
+    CMutableTransaction rawTx = ConstructTransaction(request.params[0], request.params[1], request.params[2]);
 
     return EncodeHexTx(CTransaction(rawTx));
 }
@@ -930,8 +925,7 @@ static UniValue testmempoolaccept(const JSONRPCRequest& request)
     bool test_accept_res;
     {
         LOCK(cs_main);
-        test_accept_res = AcceptToMemoryPool(mempool, state, std::move(tx),
-            nullptr /* plTxnReplaced */, false /* bypass_limits */, max_raw_tx_fee, /* test_accept */ true);
+        test_accept_res = AcceptToMemoryPool(mempool, state, std::move(tx), false /* bypass_limits */, max_raw_tx_fee);
     }
     result_0.pushKV("allowed", test_accept_res);
     if (!test_accept_res) {
@@ -1438,11 +1432,7 @@ UniValue createpsbt(const JSONRPCRequest& request)
         }, true
     );
 
-    bool rbf = false;
-    if (!request.params[3].isNull()) {
-        rbf = request.params[3].isTrue();
-    }
-    CMutableTransaction rawTx = ConstructTransaction(request.params[0], request.params[1], request.params[2], rbf);
+    CMutableTransaction rawTx = ConstructTransaction(request.params[0], request.params[1], request.params[2]);
 
     // Make a blank psbt
     PartiallySignedTransaction psbtx;

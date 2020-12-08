@@ -145,13 +145,6 @@ UniValue importprivkey(const JSONRPCRequest& request)
         if (!request.params[2].isNull())
             fRescan = request.params[2].get_bool();
 
-        if (fRescan && pwallet->chain().havePruned()) {
-            // Exit early and print an error.
-            // If a block is pruned after this check, we will import the key(s),
-            // but fail the rescan with a generic error.
-            throw JSONRPCError(RPC_WALLET_ERROR, "Rescan is disabled when blocks are pruned");
-        }
-
         if (fRescan && !reserver.reserve()) {
             throw JSONRPCError(RPC_WALLET_ERROR, "Wallet is currently rescanning. Abort existing rescan or wait.");
         }
@@ -264,13 +257,6 @@ UniValue importaddress(const JSONRPCRequest& request)
     bool fRescan = true;
     if (!request.params[2].isNull())
         fRescan = request.params[2].get_bool();
-
-    if (fRescan && pwallet->chain().havePruned()) {
-        // Exit early and print an error.
-        // If a block is pruned after this check, we will import the key(s),
-        // but fail the rescan with a generic error.
-        throw JSONRPCError(RPC_WALLET_ERROR, "Rescan is disabled when blocks are pruned");
-    }
 
     WalletRescanReserver reserver(pwallet);
     if (fRescan && !reserver.reserve()) {
@@ -466,12 +452,6 @@ UniValue importpubkey(const JSONRPCRequest& request)
     if (!request.params[2].isNull())
         fRescan = request.params[2].get_bool();
 
-    if (fRescan && pwallet->chain().havePruned()) {
-        // Exit early and print an error.
-        // If a block is pruned after this check, we will import the key(s),
-        // but fail the rescan with a generic error.
-        throw JSONRPCError(RPC_WALLET_ERROR, "Rescan is disabled when blocks are pruned");
-    }
 
     WalletRescanReserver reserver(pwallet);
     if (fRescan && !reserver.reserve()) {
@@ -540,13 +520,6 @@ UniValue importwallet(const JSONRPCRequest& request)
             }.Check(request);
 
     EnsureLegacyScriptPubKeyMan(*wallet, true);
-
-    if (pwallet->chain().havePruned()) {
-        // Exit early and print an error.
-        // If a block is pruned after this check, we will import the key(s),
-        // but fail the rescan with a generic error.
-        throw JSONRPCError(RPC_WALLET_ERROR, "Importing wallets is disabled when blocks are pruned");
-    }
 
     WalletRescanReserver reserver(pwallet);
     if (!reserver.reserve()) {

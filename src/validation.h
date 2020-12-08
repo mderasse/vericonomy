@@ -11,6 +11,7 @@
 #endif
 
 #include <amount.h>
+#include <chainparams.h>
 #include <coins.h>
 #include <crypto/common.h> // for ReadLE64
 #include <fs.h>
@@ -18,10 +19,11 @@
 #include <protocol.h> // For CMessageHeader::MessageStartChars
 #include <script/script_error.h>
 #include <sync.h>
+#include <chain.h>
 #include <txmempool.h> // For CTxMemPool::cs
 #include <txdb.h>
-#include <versionbits.h>
 #include <serialize.h>
+#include <wallet/wallet.h>
 
 #include <atomic>
 #include <map>
@@ -37,20 +39,34 @@ class CBlockIndex;
 class CBlockTreeDB;
 class CBlockUndo;
 class CChainParams;
+class CWallet;
 class CInv;
 class CConnman;
 class CScriptCheck;
-class CBlockPolicyEstimator;
 class CTxMemPool;
 class TxValidationState;
+class CKeyStore;
 struct ChainTxData;
 
 struct DisconnectedBlockTransactions;
 struct PrecomputedTransactionData;
 struct LockPoints;
 
-/** Default for -minrelaytxfee, minimum relay fee for transactions */
-static const unsigned int DEFAULT_MIN_RELAY_TX_FEE = 1000;
+/** Fee Settings */
+#if CLIENT_IS_VERIUM
+/** Original Min fee to authorize a TX */
+static const unsigned int MIN_TX_FEE = 20000000;
+/** VIP1 Min fee */
+static const unsigned int VIP1_MIN_TX_FEE = 100000;
+#else
+/** Original Min fee to authorize a TX */
+static const unsigned int MIN_TX_FEE = 10000;
+/** VIP1 Min fee */
+static const unsigned int VIP1_MIN_TX_FEE = 10000;
+#endif
+
+/** Default for accepting alerts from the P2P network. */
+static const bool DEFAULT_ALERTS = true;
 /** Default for -limitancestorcount, max number of in-mempool ancestors */
 static const unsigned int DEFAULT_ANCESTOR_LIMIT = 25;
 /** Default for -limitancestorsize, maximum kilobytes of tx + all in-mempool ancestors */
@@ -111,7 +127,7 @@ static const int64_t DEFAULT_MAX_TIP_AGE = 24 * 60 * 60;
 static const int64_t MAX_FEE_ESTIMATION_TIP_AGE = 3 * 60 * 60;
 
 static const bool DEFAULT_CHECKPOINTS_ENABLED = true;
-static const bool DEFAULT_TXINDEX = false;
+static const bool DEFAULT_TXINDEX = true;  // ppcoin: txindex is required for PoS calculations (might change in the future)
 static const char* const DEFAULT_BLOCKFILTERINDEX = "0";
 static const unsigned int DEFAULT_BANSCORE_THRESHOLD = 100;
 /** Default for -persistmempool */
@@ -136,8 +152,9 @@ struct BlockHasher
     size_t operator()(const uint256& hash) const { return ReadLE64(hash.begin()); }
 };
 
+/** If false, overide the minRelayTxfee when fee change **/
+extern bool fEnforceMinRelayTxFee;
 extern RecursiveMutex cs_main;
-extern CBlockPolicyEstimator feeEstimator;
 extern CTxMemPool mempool;
 typedef std::unordered_map<uint256, CBlockIndex*, BlockHasher> BlockMap;
 extern Mutex g_best_block_mutex;
@@ -153,6 +170,7 @@ extern bool fRequireStandard;
 extern bool fCheckBlockIndex;
 extern bool fCheckpointsEnabled;
 extern size_t nCoinCacheUsage;
+extern bool fAlerts;
 /** A fee rate smaller than this is considered zero fee (for relaying, mining and transaction creation) */
 extern CFeeRate minRelayTxFee;
 /** If the tip is older than this (in seconds), the node is considered to be in initial block download. */
@@ -167,19 +185,12 @@ extern arith_uint256 nMinimumChainWork;
 /** Best header we've seen so far (used for getheaders queries' starting points). */
 extern CBlockIndex *pindexBestHeader;
 
-/** Pruning-related variables and constants */
-/** True if any block files have ever been pruned. */
-extern bool fHavePruned;
-/** True if we're running in -prune mode. */
-extern bool fPruneMode;
-/** Number of MiB of block files that we're trying to stay below. */
-extern uint64_t nPruneTarget;
 /** Block files containing a block-height within MIN_BLOCKS_TO_KEEP of ::ChainActive().Tip() will not be pruned. */
 static const unsigned int MIN_BLOCKS_TO_KEEP = 288;
 /** Minimum blocks required to signal NODE_NETWORK_LIMITED */
 static const unsigned int NODE_NETWORK_LIMITED_MIN_BLOCKS = 288;
 
-static const signed int DEFAULT_CHECKBLOCKS = 6;
+static const signed int DEFAULT_CHECKBLOCKS = 20;
 static const unsigned int DEFAULT_CHECKLEVEL = 3;
 
 // Require that user allocate at least 550 MiB for block & undo files (blk???.dat and rev???.dat)
@@ -191,6 +202,14 @@ static const unsigned int DEFAULT_CHECKLEVEL = 3;
 // one 128MB block file + added 15% undo data = 147MB greater for a total of 545MB
 // Setting the target to >= 550 MiB will make it likely we can respect the target.
 static const uint64_t MIN_DISK_SPACE_FOR_BLOCK_FILES = 550 * 1024 * 1024;
+
+/**
+ * Compute minimum incremental transaction fee by KB base on the current block height
+ * Implement VIP1
+ */
+unsigned int GetMinTxFee(int nBlockHeight = 0);
+CFeeRate GetMinTxFeeRate(int nBlockHeight = 0);
+CFeeRate GetMinRelayTxFeeRate();
 
 /**
  * Process an incoming block. This only returns after the best known valid
@@ -242,6 +261,7 @@ bool LoadBlockIndex(const CChainParams& chainparams) EXCLUSIVE_LOCKS_REQUIRED(cs
 void UnloadBlockIndex();
 /** Run an instance of the script checking thread */
 void ThreadScriptCheck(int worker_num);
+void AlertNotify(const std::string& strMessage, bool fUpdateUI = true);
 /** Retrieve a transaction (from memory pool, or from disk, if possible) */
 bool GetTransaction(const uint256& hash, CTransactionRef& tx, const Consensus::Params& params, uint256& hashBlock, const CBlockIndex* const blockIndex = nullptr);
 /**
@@ -251,7 +271,6 @@ bool GetTransaction(const uint256& hash, CTransactionRef& tx, const Consensus::P
  * validationinterface callback.
  */
 bool ActivateBestChain(BlockValidationState& state, const CChainParams& chainparams, std::shared_ptr<const CBlock> pblock = std::shared_ptr<const CBlock>());
-CAmount GetBlockSubsidy(int nHeight, const Consensus::Params& consensusParams);
 
 /** Guess verification progress (as a fraction between 0.0=genesis and 1.0=current tip). */
 double GuessVerificationProgress(const ChainTxData& data, const CBlockIndex* pindex);
@@ -259,34 +278,11 @@ double GuessVerificationProgress(const ChainTxData& data, const CBlockIndex* pin
 /** Calculate the amount of disk space the block & undo files currently use */
 uint64_t CalculateCurrentUsage();
 
-/**
- *  Mark one block file as pruned.
- */
-void PruneOneBlockFile(const int fileNumber) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
-
-/**
- *  Actually unlink the specified files
- */
-void UnlinkPrunedFiles(const std::set<int>& setFilesToPrune);
-
-/** Prune block files up to a given height */
-void PruneBlockFilesManual(int nManualPruneHeight);
 
 /** (try to) add transaction to memory pool
  * plTxnReplaced will be appended to with all transactions replaced from mempool **/
 bool AcceptToMemoryPool(CTxMemPool& pool, TxValidationState &state, const CTransactionRef &tx,
-                        std::list<CTransactionRef>* plTxnReplaced,
-                        bool bypass_limits, const CAmount nAbsurdFee, bool test_accept=false) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
-
-/** Get the BIP9 state for a given deployment at the current tip. */
-ThresholdState VersionBitsTipState(const Consensus::Params& params, Consensus::DeploymentPos pos);
-
-/** Get the numerical statistics for the BIP9 state for a given deployment at the current tip. */
-BIP9Stats VersionBitsTipStatistics(const Consensus::Params& params, Consensus::DeploymentPos pos);
-
-/** Get the block height at which the BIP9 deployment switched into the state for the block building on the current tip. */
-int VersionBitsTipStateSinceHeight(const Consensus::Params& params, Consensus::DeploymentPos pos);
-
+                        bool bypass_limits, bool test_accept=false) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
 
 /** Apply the effects of this transaction on the UTXO set represented by view */
 void UpdateCoins(const CTransaction& tx, CCoinsViewCache& inputs, int nHeight);
@@ -755,6 +751,8 @@ private:
     void EraseBlockData(CBlockIndex* index) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
 };
 
+unsigned int GetNextTargetOrWorkRequired(const CBlockIndex* pindexLast, const Consensus::Params& params);
+
 /** Mark a block as precious and reorganize.
  *
  * May not be called in a
@@ -792,8 +790,6 @@ extern std::unique_ptr<CBlockTreeDB> pblocktree;
  */
 int GetSpendHeight(const CCoinsViewCache& inputs);
 
-extern VersionBitsCache versionbitscache;
-
 /**
  * Determine what nVersion a new block should use.
  */
@@ -807,11 +803,5 @@ bool DumpMempool(const CTxMemPool& pool);
 
 /** Load the mempool from disk. */
 bool LoadMempool(CTxMemPool& pool);
-
-//! Check whether the block associated with this index entry is pruned or not.
-inline bool IsBlockPruned(const CBlockIndex* pblockindex)
-{
-    return (fHavePruned && !(pblockindex->nStatus & BLOCK_HAVE_DATA) && pblockindex->nTx > 0);
-}
 
 #endif // BITCOIN_VALIDATION_H

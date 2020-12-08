@@ -11,6 +11,7 @@
 #include <string>
 
 class CBlockIndex;
+class uint256;
 namespace boost {
 namespace signals2 {
 class connection;
@@ -97,9 +98,10 @@ public:
     ADD_SIGNALS_DECL_WRAPPER(NotifyNetworkActiveChanged, void, bool networkActive);
 
     /**
-     * Status bar alerts changed.
+     * New, updated or cancelled alert.
+     * @note sometimes called with lock cs_mapAlerts held.
      */
-    ADD_SIGNALS_DECL_WRAPPER(NotifyAlertChanged, void, );
+    ADD_SIGNALS_DECL_WRAPPER(NotifyAlertChanged, void, const uint256 &hash, ChangeType status);
 
     /**
      * Show progress e.g. for verifychain.

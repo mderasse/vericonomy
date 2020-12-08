@@ -38,6 +38,7 @@
 
 class CScheduler;
 class CNode;
+class CWallet;
 class BanMan;
 
 /** Default for -whitelistrelay. */
@@ -480,6 +481,7 @@ private:
 
     friend struct CConnmanTest;
     friend struct ConnmanTestMsg;
+    friend void Miner(CWallet *pwallet);
 };
 void Discover();
 void StartMapPort();
@@ -797,6 +799,8 @@ public:
     std::vector<CAddress> vAddrToSend;
     const std::unique_ptr<CRollingBloomFilter> m_addr_known;
     bool fGetAddr{false};
+    std::set<uint256> setKnown;
+    uint256 hashCheckpointKnown; // ppcoin: known sent sync-checkpoint
     std::chrono::microseconds m_next_addr_send GUARDED_BY(cs_sendProcessing){0};
     std::chrono::microseconds m_next_local_addr_send GUARDED_BY(cs_sendProcessing){0};
 

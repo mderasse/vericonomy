@@ -10,6 +10,7 @@
 #include <net_types.h>  // For banmap_t
 #include <netaddress.h> // For Network
 #include <support/allocators/secure.h> // For SecureString
+#include <ui_interface.h> // For ChangeType
 
 #include <functional>
 #include <memory>
@@ -168,9 +169,6 @@ public:
     //! Get network active.
     virtual bool getNetworkActive() = 0;
 
-    //! Estimate smart fee.
-    virtual CFeeRate estimateSmartFee(int num_blocks, bool conservative, int* returned_target = nullptr) = 0;
-
     //! Get dust relay fee.
     virtual CFeeRate getDustRelayFee() = 0;
 
@@ -239,7 +237,7 @@ public:
     virtual std::unique_ptr<Handler> handleNotifyNetworkActiveChanged(NotifyNetworkActiveChangedFn fn) = 0;
 
     //! Register handler for notify alert messages.
-    using NotifyAlertChangedFn = std::function<void()>;
+    using NotifyAlertChangedFn = std::function<void(const uint256 &hash, ChangeType status)>;
     virtual std::unique_ptr<Handler> handleNotifyAlertChanged(NotifyAlertChangedFn fn) = 0;
 
     //! Register handler for ban list messages.

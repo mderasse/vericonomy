@@ -3,6 +3,9 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include <alert.h>
+//#include <checkpointsync.h>
+
 #include <warnings.h>
 
 #include <sync.h>
@@ -13,6 +16,7 @@ static RecursiveMutex cs_warnings;
 static std::string strMiscWarning GUARDED_BY(cs_warnings);
 static bool fLargeWorkForkFound GUARDED_BY(cs_warnings) = false;
 static bool fLargeWorkInvalidChainFound GUARDED_BY(cs_warnings) = false;
+std::string strMintWarning;
 
 void SetMiscWarning(const std::string& strWarning)
 {
@@ -40,6 +44,7 @@ void SetfLargeWorkInvalidChainFound(bool flag)
 
 std::string GetWarnings(bool verbose)
 {
+    int nPriority = 0;
     std::string warnings_concise;
     std::string warnings_verbose;
     const std::string warning_separator = "<hr />";
@@ -52,18 +57,43 @@ std::string GetWarnings(bool verbose)
         warnings_verbose = _("This is a pre-release test build - use at your own risk - do not use for mining or merchant applications").translated;
     }
 
+    if (strMintWarning != "")
+    {
+        nPriority = 0;
+        warnings_concise = strMintWarning;
+        warnings_verbose += (warnings_verbose.empty() ? "" : warning_separator) + _(strMintWarning.c_str()).translated;
+    }
+
     // Misc warnings like out of disk space and clock is wrong
     if (strMiscWarning != "") {
+        nPriority = 1000;
         warnings_concise = strMiscWarning;
         warnings_verbose += (warnings_verbose.empty() ? "" : warning_separator) + strMiscWarning;
     }
 
     if (fLargeWorkForkFound) {
+        nPriority = 2000;
         warnings_concise = "Warning: The network does not appear to fully agree! Some miners appear to be experiencing issues.";
         warnings_verbose += (warnings_verbose.empty() ? "" : warning_separator) + _("Warning: The network does not appear to fully agree! Some miners appear to be experiencing issues.").translated;
     } else if (fLargeWorkInvalidChainFound) {
+        nPriority = 2000;
         warnings_concise = "Warning: We do not appear to fully agree with our peers! You may need to upgrade, or other nodes may need to upgrade.";
         warnings_verbose += (warnings_verbose.empty() ? "" : warning_separator) + _("Warning: We do not appear to fully agree with our peers! You may need to upgrade, or other nodes may need to upgrade.").translated;
+    }
+
+    // Alerts
+    {
+        LOCK(cs_mapAlerts);
+        for (const auto& item : mapAlerts)
+        {
+            const CAlert& alert = item.second;
+            if (alert.AppliesToMe() && alert.nPriority > nPriority)
+            {
+                nPriority = alert.nPriority;
+                warnings_concise = alert.strStatusBar;
+                warnings_verbose += (warnings_verbose.empty() ? "" : warning_separator) + warnings_concise;
+            }
+        }
     }
 
     if (verbose) return warnings_verbose;

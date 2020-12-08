@@ -102,9 +102,11 @@ endif
 BITCOIN_CORE_H = \
   addrdb.h \
   addrman.h \
+  alert.h \
   attributes.h \
   banman.h \
   base58.h \
+  bignum.h \
   bech32.h \
   bloom.h \
   blockencodings.h \
@@ -129,6 +131,7 @@ BITCOIN_CORE_H = \
   core_io.h \
   core_memusage.h \
   cuckoocache.h \
+  downloader.h \
   flatfile.h \
   fs.h \
   httprpc.h \
@@ -170,8 +173,8 @@ BITCOIN_CORE_H = \
   policy/feerate.h \
   policy/fees.h \
   policy/policy.h \
-  policy/rbf.h \
   policy/settings.h \
+  pos.h \
   pow.h \
   protocol.h \
   psbt.h \
@@ -214,14 +217,13 @@ BITCOIN_CORE_H = \
   util/bytevectorhash.h \
   util/check.h \
   util/error.h \
-  util/fees.h \
+  util/miniunz.h \
   util/spanparsing.h \
   util/system.h \
   util/macros.h \
   util/memory.h \
   util/message.h \
   util/moneystr.h \
-  util/rbf.h \
   util/settings.h \
   util/string.h \
   util/threadnames.h \
@@ -231,13 +233,10 @@ BITCOIN_CORE_H = \
   util/vector.h \
   validation.h \
   validationinterface.h \
-  versionbits.h \
-  versionbitsinfo.h \
   walletinitinterface.h \
   wallet/coincontrol.h \
   wallet/crypter.h \
   wallet/db.h \
-  wallet/feebumper.h \
   wallet/fees.h \
   wallet/ismine.h \
   wallet/load.h \
@@ -271,11 +270,13 @@ libbitcoin_server_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 libbitcoin_server_a_SOURCES = \
   addrdb.cpp \
   addrman.cpp \
+  alert.cpp \
   banman.cpp \
   blockencodings.cpp \
   blockfilter.cpp \
   chain.cpp \
   consensus/tx_verify.cpp \
+  downloader.cpp \
   flatfile.cpp \
   httprpc.cpp \
   httpserver.cpp \
@@ -296,8 +297,8 @@ libbitcoin_server_a_SOURCES = \
   node/transaction.cpp \
   noui.cpp \
   policy/fees.cpp \
-  policy/rbf.cpp \
   policy/settings.cpp \
+  pos.cpp \
   pow.cpp \
   rest.cpp \
   rpc/blockchain.cpp \
@@ -313,9 +314,9 @@ libbitcoin_server_a_SOURCES = \
   txdb.cpp \
   txmempool.cpp \
   ui_interface.cpp \
+  util/miniunz.cpp \
   validation.cpp \
   validationinterface.cpp \
-  versionbits.cpp \
   $(BITCOIN_CORE_H)
 
 if ENABLE_WALLET
@@ -345,7 +346,6 @@ libbitcoin_wallet_a_SOURCES = \
   wallet/coincontrol.cpp \
   wallet/crypter.cpp \
   wallet/db.cpp \
-  wallet/feebumper.cpp \
   wallet/fees.cpp \
   wallet/load.cpp \
   wallet/rpcdump.cpp \
@@ -492,7 +492,6 @@ libbitcoin_common_a_SOURCES = \
   script/sign.cpp \
   script/signingprovider.cpp \
   script/standard.cpp \
-  versionbitsinfo.cpp \
   warnings.cpp \
   $(BITCOIN_CORE_H)
 
@@ -522,11 +521,9 @@ libbitcoin_util_a_SOURCES = \
   util/bip32.cpp \
   util/bytevectorhash.cpp \
   util/error.cpp \
-  util/fees.cpp \
   util/system.cpp \
   util/message.cpp \
   util/moneystr.cpp \
-  util/rbf.cpp \
   util/settings.cpp \
   util/threadnames.cpp \
   util/spanparsing.cpp \
@@ -577,7 +574,7 @@ bitcoind_LDADD = \
   $(LIBMEMENV) \
   $(LIBSECP256K1)
 
-bitcoind_LDADD += $(BOOST_LIBS) $(BDB_LIBS) $(MINIUPNPC_LIBS) $(EVENT_PTHREADS_LIBS) $(EVENT_LIBS) $(ZMQ_LIBS)
+bitcoind_LDADD += $(BOOST_LIBS) $(BDB_LIBS) $(MINIUPNPC_LIBS) $(EVENT_PTHREADS_LIBS) $(EVENT_LIBS) $(ZMQ_LIBS) $(MINIZIP_LIBS) $(CURL_LIBS)
 
 # bitcoin-cli binary #
 bitcoin_cli_SOURCES = bitcoin-cli.cpp
@@ -595,7 +592,7 @@ bitcoin_cli_LDADD = \
   $(LIBBITCOIN_UTIL) \
   $(LIBBITCOIN_CRYPTO)
 
-bitcoin_cli_LDADD += $(BOOST_LIBS) $(EVENT_LIBS)
+bitcoin_cli_LDADD += $(BOOST_LIBS) $(EVENT_LIBS) $(MINIZIP_LIBS) $(CURL_LIBS)
 #
 
 # bitcoin-tx binary #
@@ -616,7 +613,7 @@ bitcoin_tx_LDADD = \
   $(LIBBITCOIN_CRYPTO) \
   $(LIBSECP256K1)
 
-bitcoin_tx_LDADD += $(BOOST_LIBS)
+bitcoin_tx_LDADD += $(BOOST_LIBS) $(MINIZIP_LIBS) $(CURL_LIBS)
 #
 
 # bitcoin-wallet binary #
@@ -643,7 +640,7 @@ bitcoin_wallet_LDADD = \
   $(LIBSECP256K1) \
   $(LIBUNIVALUE)
 
-bitcoin_wallet_LDADD += $(BOOST_LIBS) $(BDB_LIBS) $(EVENT_PTHREADS_LIBS) $(EVENT_LIBS) $(MINIUPNPC_LIBS) $(ZMQ_LIBS)
+bitcoin_wallet_LDADD += $(BOOST_LIBS) $(BDB_LIBS) $(EVENT_PTHREADS_LIBS) $(EVENT_LIBS) $(MINIUPNPC_LIBS) $(ZMQ_LIBS) $(MINIZIP_LIBS) $(CURL_LIBS)
 #
 
 # bitcoinconsensus library #
